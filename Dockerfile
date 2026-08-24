@@ -1,28 +1,36 @@
-# Krok 1 odbudowy: slim + zaleznosci systemowe (git, curl, ffmpeg, libsndfile1).
-# Cel: sprawdzic, czy to warstwa apt-get wiesza build na RunPod.
-# Nadal zero CUDA, zero ACE-Step, zero torcha, zero pre-downloadu modeli.
-FROM python:3.10-slim
+# Krok 2 odbudowy: powrot na baze CUDA. Nadal bez torcha i bez ACE-Step.
+# Cel: sprawdzic, czy sam obraz CUDA (~7 GB) przechodzi build, push i pull.
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+
+# Bez tego apt potrafi zawisnac na interaktywnym pytaniu tzdata o strefe czasowa.
+# Oryginalny Dockerfile tego nie mial.
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Pierwszy slad w logu. Jesli tego NIE widac, build nie wystartowal w ogole
-# (problem po stronie infrastruktury RunPoda, nie Dockerfile'a).
-RUN echo "===== BUILD STAMP: krok-1 / rebuild-1 / disk=31GB cuda=ALL gpu=AMPERE_24 ====="
+# Pierwszy slad w logu - jesli tego nie widac, build nie wystartowal.
+RUN echo "===== BUILD STAMP: krok-2 / baza CUDA 12.1.1-cudnn8-devel ====="
 
+# Baza CUDA to czysta Ubuntu 22.04 - Pythona trzeba doinstalowac (python3 = 3.10).
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 \
+        python3-pip \
         git \
         curl \
         ffmpeg \
         libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Drugi slad - jesli to widac, warstwa apt-get przeszla w calosci.
-RUN git --version && curl --version | head -1 \
+# Drugi slad - potwierdza, ze warstwa systemowa i toolchain CUDA sa na miejscu.
+RUN python3 --version \
+    && pip3 --version \
+    && git --version \
     && ffmpeg -version | head -1 \
-    && ldconfig -p | grep libsndfile
+    && ldconfig -p | grep libsndfile \
+    && (nvcc --version | tail -2 || echo "nvcc: brak w PATH")
 
-RUN pip install --no-cache-dir runpod
+RUN pip3 install --no-cache-dir runpod
 
 COPY handler.py .
 
-CMD ["python", "-u", "handler.py"]
+CMD ["python3", "-u", "handler.py"]
