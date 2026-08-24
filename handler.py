@@ -15,6 +15,23 @@ import sys
 import runpod
 
 
+def _gpu_kernel_test(torch):
+    """Faktyczne uruchomienie kernela na karcie.
+
+    To jedyny wiarygodny dowod, ze kola torcha zawieraja kod dla architektury
+    tej karty. Sam cuda_available=True go nie daje: torch potrafi zainicjowac
+    CUDA, a dopiero konkretna operacja konczy sie bledem
+    "no kernel image is available for execution on the device".
+    """
+    try:
+        a = torch.randn(64, 64, device="cuda")
+        b = torch.randn(64, 64, device="cuda")
+        wynik = float((a @ b).sum().item())
+        return {"ok": True, "suma_matmul": wynik}
+    except Exception as exc:
+        return {"ok": False, "blad": f"{type(exc).__name__}: {exc}"}
+
+
 def _torch_info():
     """Stan torcha. Do kroku 3 torcha nie ma i to jest oczekiwane."""
     try:
@@ -30,8 +47,13 @@ def _torch_info():
     try:
         info["cuda_available"] = torch.cuda.is_available()
         if info["cuda_available"]:
+            # Uwaga: get_arch_list() zwraca [] gdy is_available() jest False,
+            # wiec na maszynie bez GPU ta lista nic nie mowi.
+            info["arch_list"] = torch.cuda.get_arch_list()
             info["device_count"] = torch.cuda.device_count()
             info["device_name"] = torch.cuda.get_device_name(0)
+            info["device_capability"] = "%d.%d" % torch.cuda.get_device_capability(0)
+            info["kernel_test"] = _gpu_kernel_test(torch)
     except Exception as exc:
         info["cuda_error"] = f"{type(exc).__name__}: {exc}"
     return info
