@@ -5,6 +5,10 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# Pierwszy slad w logu. Jesli tego NIE widac, build nie wystartowal w ogole
+# (problem po stronie infrastruktury RunPoda, nie Dockerfile'a).
+RUN echo "===== BUILD STAMP: krok-1 / rebuild-1 / disk=31GB cuda=ALL gpu=AMPERE_24 ====="
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         curl \
@@ -12,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Slad w logu builda - jesli to widac, warstwa apt-get przeszla w calosci.
+# Drugi slad - jesli to widac, warstwa apt-get przeszla w calosci.
 RUN git --version && curl --version | head -1 \
     && ffmpeg -version | head -1 \
     && ldconfig -p | grep libsndfile
