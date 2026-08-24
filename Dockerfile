@@ -1,6 +1,12 @@
-# Krok 2 odbudowy: powrot na baze CUDA. Nadal bez torcha i bez ACE-Step.
-# Cel: sprawdzic, czy sam obraz CUDA (~7 GB) przechodzi build, push i pull.
-FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+# Krok 2b: podbicie CUDA z 12.1.1 na 12.8.1. Nadal bez torcha i bez ACE-Step.
+#
+# Powod: worker RunPoda oddaje karte "RTX PRO 6000 Blackwell Server Edition".
+# CUDA 12.1 nie zna architektury Blackwell (sm_120) - wsparcie weszlo w 12.8.
+# Na 12.1 torch zbudowalby sie bez bledu i dopiero pierwsze wywolanie na GPU
+# zwrociloby "no kernel image is available for execution on the device".
+#
+# W nowszych tagach nvidia/cuda "cudnn8" nazywa sie juz "cudnn".
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
 
 # Bez tego apt potrafi zawisnac na interaktywnym pytaniu tzdata o strefe czasowa.
 # Oryginalny Dockerfile tego nie mial.
@@ -9,7 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
 # Pierwszy slad w logu - jesli tego nie widac, build nie wystartowal.
-RUN echo "===== BUILD STAMP: krok-2 / baza CUDA 12.1.1-cudnn8-devel ====="
+RUN echo "===== BUILD STAMP: krok-2b / baza CUDA 12.8.1-cudnn-devel ====="
 
 # Baza CUDA to czysta Ubuntu 22.04 - Pythona trzeba doinstalowac (python3 = 3.10).
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -37,7 +43,7 @@ RUN pip3 install --no-cache-dir runpod
 # cache wszystkich warstw ponizej.
 ARG GIT_SHA=nieznany
 ENV GIT_SHA=$GIT_SHA
-ENV BUILD_STEP="krok-2: nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04"
+ENV BUILD_STEP="krok-2b: nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04"
 
 COPY handler.py .
 

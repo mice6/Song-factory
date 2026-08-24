@@ -42,7 +42,7 @@ def _nvidia_smi():
     try:
         proc = subprocess.run(
             ["nvidia-smi",
-             "--query-gpu=name,memory.total,driver_version",
+             "--query-gpu=name,compute_cap,memory.total,driver_version",
              "--format=csv,noheader"],
             capture_output=True, text=True, timeout=15,
         )
