@@ -16,23 +16,6 @@ jobs:
       packages: write
 
     steps:
-      # Obraz CUDA + torch nie miesci sie na domyslnym dysku runnera
-      # (~14 GB wolnego). Kasowanie preinstalowanych toolchainow zwalnia 25-30 GB.
-      - name: Zwolnij miejsce na dysku runnera
-        run: |
-          echo "--- przed czyszczeniem ---"
-          df -h /
-          sudo rm -rf \
-            /usr/share/dotnet \
-            /usr/local/lib/android \
-            /opt/ghc \
-            /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL \
-            /usr/local/share/boost
-          sudo docker image prune --all --force
-          echo "--- po czyszczeniu ---"
-          df -h /
-
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
@@ -53,5 +36,5 @@ jobs:
           tags: |
             ghcr.io/mice6/song-factory:minimal-test
             ghcr.io/mice6/song-factory:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/mice6/song-factory:buildcache
+          cache-to: type=registry,ref=ghcr.io/mice6/song-factory:buildcache,mode=max
