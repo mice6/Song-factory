@@ -31,6 +31,14 @@ RUN python3 --version \
 
 RUN pip3 install --no-cache-dir runpod
 
+# Znacznik kroku i SHA commita wstrzykiwane do obrazu - handler zwraca je
+# w odpowiedzi, wiec od razu widac, ktory build faktycznie wstal na workerze.
+# Celowo na koncu pliku: ARG zmieniajacy sie przy kazdym commicie uniewaznilby
+# cache wszystkich warstw ponizej.
+ARG GIT_SHA=nieznany
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_STEP="krok-2: nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04"
+
 COPY handler.py .
 
 CMD ["python3", "-u", "handler.py"]

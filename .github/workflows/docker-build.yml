@@ -33,6 +33,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
           tags: |
             ghcr.io/mice6/song-factory:minimal-test
             ghcr.io/mice6/song-factory:${{ github.sha }}
