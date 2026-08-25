@@ -94,7 +94,7 @@ RUN pip install --no-cache-dir runpod
 
 # Czwarty slad - twardy warunek powodzenia kroku 4. Jesli import nie przejdzie,
 # build ma pasc tutaj, w logu, a nie po cichu na workerze.
-RUN python -c "import acestep; print('acestep OK:', acestep.__file__)"     && python -c "import runpod; print('runpod OK')"
+RUN python -c "import acestep; print('acestep OK:', acestep.__file__)"     && python -c "from acestep.inference import generate_music, GenerationParams; print('acestep.inference OK:', generate_music.__name__, GenerationParams.__name__)"     && python -c "import runpod; print('runpod OK')"
 
 # Znacznik kroku i SHA commita wstrzykiwane do obrazu - handler zwraca je
 # w odpowiedzi, wiec od razu widac, ktory build faktycznie wstal na workerze.

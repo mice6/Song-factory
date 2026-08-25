@@ -88,6 +88,19 @@ def _acestep_info():
         info["version"] = version("ace-step")
     except Exception as exc:
         info["version_blad"] = f"{type(exc).__name__}: {exc}"
+
+    # Wlasciwe API siedzi w acestep.inference, nie w acestep_v15_pipeline
+    # (ten drugi to launcher Gradio). Sam "import acestep" niczego nie dowodzi,
+    # bo __init__.py zawiera tylko docstring.
+    try:
+        from acestep.inference import generate_music, GenerationParams
+        info["inference_api"] = {
+            "ok": True,
+            "generate_music": callable(generate_music),
+            "GenerationParams": GenerationParams.__name__,
+        }
+    except Exception as exc:
+        info["inference_api"] = {"ok": False, "blad": f"{type(exc).__name__}: {exc}"}
     return info
 
 
