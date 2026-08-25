@@ -1,5 +1,10 @@
-# Krok 3b: Python 3.12 + torch 2.10.0 cu128. Nadal bez ACE-Step, ale juz
-# w wersjach, ktorych ACE-Step wymaga.
+# Krok 3c: baza cudnn-devel -> runtime. Bez zmian funkcjonalnych.
+#
+# Powod: Dockerfile z ace-step/ACE-Step-1.5 uzywa
+# nvidia/cuda:12.8.1-runtime-ubuntu22.04 - czyli ani nvcc, ani naglowkow,
+# ani cuDNN z bazy nie potrzeba. cuDNN przywozi torch przez pip
+# (nvidia-cudnn-cu12), wiec w cudnn-devel siedzialo to podwojnie.
+# Skoro upstream buduje na runtime, nic z zaleznosci nie kompiluje kerneli.
 #
 # Dlaczego nie ubuntu22.04 i torch 2.9.1 jak w kroku 3:
 # pyproject.toml z ace-step/ACE-Step-1.5 deklaruje
@@ -9,7 +14,7 @@
 #
 # CUDA 12.8, bo karta na workerze to Blackwell (compute capability 12.0).
 # Potwierdzone wykonaniem: arch_list zawiera sm_120, a matmul na GPU przechodzi.
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
+FROM nvidia/cuda:12.8.1-runtime-ubuntu24.04
 
 # Bez tego apt potrafi zawisnac na interaktywnym pytaniu tzdata o strefe czasowa.
 ENV DEBIAN_FRONTEND=noninteractive
@@ -17,7 +22,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
 # Pierwszy slad w logu - jesli tego nie widac, build nie wystartowal.
-RUN echo "===== BUILD STAMP: krok-3b / Ubuntu 24.04 + Python 3.12 + torch 2.10 ====="
+RUN echo "===== BUILD STAMP: krok-3c / baza runtime zamiast cudnn-devel ====="
 
 # Na 24.04 python3 to 3.12. python3-venv, bo instalujemy do wlasnego venva.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -42,7 +47,7 @@ RUN python --version \
     && git --version \
     && ffmpeg -version | head -1 \
     && ldconfig -p | grep libsndfile \
-    && (nvcc --version | tail -2 || echo "nvcc: brak w PATH")
+    && (nvcc --version | tail -2 || echo "nvcc: brak w PATH (oczekiwane na bazie runtime)")
 
 RUN pip install --no-cache-dir runpod
 
@@ -70,7 +75,7 @@ print('cuda build', torch.version.cuda)"
 # cache wszystkich warstw ponizej.
 ARG GIT_SHA=nieznany
 ENV GIT_SHA=$GIT_SHA
-ENV BUILD_STEP="krok-3b: Ubuntu 24.04, Python 3.12, torch 2.10.0 cu128"
+ENV BUILD_STEP="krok-3c: baza runtime, Python 3.12, torch 2.10.0 cu128"
 
 COPY handler.py .
 
