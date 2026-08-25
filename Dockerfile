@@ -1,4 +1,5 @@
-# Krok 3c: baza cudnn-devel -> runtime. Bez zmian funkcjonalnych.
+# Krok 4: instalacja ACE-Step 1.5. Bez modeli i bez zmiany handlera -
+# ten krok konczy sie na tym, ze "import acestep" przechodzi.
 #
 # Powod: Dockerfile z ace-step/ACE-Step-1.5 uzywa
 # nvidia/cuda:12.8.1-runtime-ubuntu22.04 - czyli ani nvcc, ani naglowkow,
@@ -22,7 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
 # Pierwszy slad w logu - jesli tego nie widac, build nie wystartowal.
-RUN echo "===== BUILD STAMP: krok-3c / baza runtime zamiast cudnn-devel ====="
+RUN echo "===== BUILD STAMP: krok-4 / instalacja ACE-Step 1.5 ====="
 
 # Na 24.04 python3 to 3.12. python3-venv, bo instalujemy do wlasnego venva.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -49,8 +50,6 @@ RUN python --version \
     && ldconfig -p | grep libsndfile \
     && (nvcc --version | tail -2 || echo "nvcc: brak w PATH (oczekiwane na bazie runtime)")
 
-RUN pip install --no-cache-dir runpod
-
 # Wersje wprost z pyproject.toml ACE-Step dla linux/x86_64. torchvision jest
 # tam wymagany, wiec instalujemy go od razu - inaczej doszedlby w kroku 4
 # i pociagnal za soba przeliczenie calej reszty.
@@ -69,13 +68,41 @@ print('torchvision', torchvision.__version__); \
 print('torchaudio', torchaudio.__version__); \
 print('cuda build', torch.version.cuda)"
 
+# ---- ACE-Step 1.5 -------------------------------------------------------
+# uv, tak jak w Dockerfile upstreamu. Instalacja pipem nie wchodzi w gre:
+# pyproject.toml ma [tool.uv.sources] dla nano-vllm, czego pip nie rozumie.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Klon do osobnego katalogu, nie do /app. Oryginalny Dockerfile na main robil
+# "git clone ... ." prosto do WORKDIR, gdzie chwile pozniej ladowal COPY
+# handler.py - nasz kod mieszal sie z ich repo.
+# Commit przypiety: build ma byc powtarzalny, a ruchome main bylo by kolejna
+# zmienna przy diagnozowaniu "na ktorym kroku sie zepsulo".
+ARG ACESTEP_COMMIT=14c0211d5a0653b0f63e27686f4c3f151b4d8629
+RUN git clone https://github.com/ace-step/ACE-Step-1.5.git /opt/ace-step     && cd /opt/ace-step     && git checkout --quiet "$ACESTEP_COMMIT"     && git --no-pager log -1 --format="ACE-Step przypiety na %h z %ad" --date=short
+
+# uv instaluje do NASZEGO venva zamiast tworzyc wlasny - dzieki temu widzi juz
+# zainstalowanego torcha 2.10.0+cu128 jako spelnionego i nie ciagnie go drugi raz.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+WORKDIR /opt/ace-step
+RUN uv sync --frozen --no-dev
+WORKDIR /app
+
+# runpod dopiero teraz: "uv sync" usuwa z venva pakiety spoza uv.lock,
+# a runpod tam nie wystepuje. Zainstalowany wczesniej zostalby skasowany.
+RUN pip install --no-cache-dir runpod
+
+# Czwarty slad - twardy warunek powodzenia kroku 4. Jesli import nie przejdzie,
+# build ma pasc tutaj, w logu, a nie po cichu na workerze.
+RUN python -c "import acestep; print('acestep OK:', acestep.__file__)"     && python -c "import runpod; print('runpod OK')"
+
 # Znacznik kroku i SHA commita wstrzykiwane do obrazu - handler zwraca je
 # w odpowiedzi, wiec od razu widac, ktory build faktycznie wstal na workerze.
 # Celowo na koncu pliku: ARG zmieniajacy sie przy kazdym commicie uniewaznilby
 # cache wszystkich warstw ponizej.
 ARG GIT_SHA=nieznany
 ENV GIT_SHA=$GIT_SHA
-ENV BUILD_STEP="krok-3c: baza runtime, Python 3.12, torch 2.10.0 cu128"
+ENV BUILD_STEP="krok-4: ACE-Step 1.5 zainstalowany (bez modeli)"
 
 COPY handler.py .
 

@@ -75,6 +75,22 @@ def _nvidia_smi():
     return proc.stdout.strip()
 
 
+def _acestep_info():
+    """Czy ACE-Step da sie zaimportowac w tym obrazie."""
+    try:
+        import acestep
+    except ImportError as exc:
+        return {"installed": False, "blad": f"{type(exc).__name__}: {exc}"}
+
+    info = {"installed": True, "path": getattr(acestep, "__file__", None)}
+    try:
+        from importlib.metadata import version
+        info["version"] = version("ace-step")
+    except Exception as exc:
+        info["version_blad"] = f"{type(exc).__name__}: {exc}"
+    return info
+
+
 def environment():
     return {
         "step": os.environ.get("BUILD_STEP", "nieznany"),
@@ -84,6 +100,7 @@ def environment():
         "cuda_version_env": os.environ.get("CUDA_VERSION"),
         "nvidia_smi": _nvidia_smi(),
         "torch": _torch_info(),
+        "acestep": _acestep_info(),
     }
 
 
@@ -103,4 +120,5 @@ if __name__ == "__main__":
     print(f"[startup] python={env['python']}")
     print(f"[startup] nvidia-smi: {env['nvidia_smi']}")
     print(f"[startup] torch: {env['torch']}")
+    print(f"[startup] acestep: {env['acestep']}")
     runpod.serverless.start({"handler": handler})
