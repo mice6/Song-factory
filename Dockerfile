@@ -1,5 +1,5 @@
-# Krok 5: pre-download wag do obrazu. Bez zmiany logiki handlera -
-# ten krok konczy sie na tym, ze wagi leza w cache'u HF wewnatrz obrazu.
+# Krok 6: realny handler generujacy audio. Dockerfile bez zmian poza
+# znacznikiem - caly ciezar tego kroku jest w handler.py.
 #
 # Powod: Dockerfile z ace-step/ACE-Step-1.5 uzywa
 # nvidia/cuda:12.8.1-runtime-ubuntu22.04 - czyli ani nvcc, ani naglowkow,
@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
 # Pierwszy slad w logu - jesli tego nie widac, build nie wystartowal.
-RUN echo "===== BUILD STAMP: krok-5b / wagi w checkpoints, nie w HF_HOME ====="
+RUN echo "===== BUILD STAMP: krok-6 / handler generujacy audio ====="
 
 # Na 24.04 python3 to 3.12. python3-venv, bo instalujemy do wlasnego venva.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -131,7 +131,7 @@ RUN python -c "import os; root='/opt/ace-step/checkpoints'; wymagane=['acestep-v
 # cache wszystkich warstw ponizej.
 ARG GIT_SHA=nieznany
 ENV GIT_SHA=$GIT_SHA
-ENV BUILD_STEP="krok-5b: wagi w /opt/ace-step/checkpoints"
+ENV BUILD_STEP="krok-6: handler generujacy audio (ACE-Step turbo + LM 1.7B)"
 
 COPY handler.py .
 
