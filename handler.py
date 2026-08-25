@@ -105,32 +105,46 @@ def _acestep_info():
 
 
 def _wagi_info():
-    """Czy wagi sa w obrazie. Jesli nie, generowanie probowaloby pobrac je
-    na workerze przy pierwszym zadaniu - czyli cold start liczony w minutach."""
-    root = os.environ.get("HF_HOME")
-    if not root:
-        return {"hf_home": None}
-    if not os.path.isdir(root):
-        return {"hf_home": root, "istnieje": False}
+    """Czy wagi leza tam, gdzie ACE-Step ich szuka.
 
-    rozmiar, liczba = 0, 0
+    ensure_model_downloaded() sprawdza {project_root}/checkpoints/<nazwa> i
+    pobiera 9,4 GB, jesli katalog nie istnieje lub jest pusty. Cache HF nie
+    jest w tej sciezce uzywany, bo pobieranie idzie przez local_dir=.
+    """
+    root = os.path.join(
+        os.environ.get("ACESTEP_PROJECT_ROOT", "/opt/ace-step"), "checkpoints")
+    wymagane = ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B",
+                "Qwen3-Embedding-0.6B", "vae")
+
+    if not os.path.isdir(root):
+        return {"checkpoints": root, "istnieje": False}
+
+    obecne, brakujace = [], []
+    for nazwa in wymagane:
+        sciezka = os.path.join(root, nazwa)
+        if os.path.isdir(sciezka) and os.listdir(sciezka):
+            obecne.append(nazwa)
+        else:
+            brakujace.append(nazwa)
+
+    rozmiar = 0
     for katalog, _, nazwy in os.walk(root):
         for n in nazwy:
+            f = os.path.join(katalog, n)
+            if os.path.islink(f):
+                continue
             try:
-                rozmiar += os.path.getsize(os.path.join(katalog, n))
-                liczba += 1
+                rozmiar += os.path.getsize(f)
             except OSError:
                 pass
-    obecne = [k for k in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B",
-                          "Qwen3-Embedding-0.6B", "vae")
-              if os.path.isdir(root) and any(
-                  k in d for d, _, _ in os.walk(root))]
+
     return {
-        "hf_home": root,
+        "checkpoints": root,
         "istnieje": True,
-        "plikow": liczba,
         "rozmiar_gb": round(rozmiar / 1024 ** 3, 2),
-        "komponenty": obecne,
+        "obecne": obecne,
+        "brakujace": brakujace,
+        "pobieranie_w_runtime": bool(brakujace),
     }
 
 

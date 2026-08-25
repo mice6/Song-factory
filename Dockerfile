@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
 # Pierwszy slad w logu - jesli tego nie widac, build nie wystartowal.
-RUN echo "===== BUILD STAMP: krok-5 / pre-download wag ACE-Step ====="
+RUN echo "===== BUILD STAMP: krok-5b / wagi w checkpoints, nie w HF_HOME ====="
 
 # Na 24.04 python3 to 3.12. python3-venv, bo instalujemy do wlasnego venva.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -97,25 +97,33 @@ RUN pip install --no-cache-dir runpod
 RUN python -c "import acestep; print('acestep OK:', acestep.__file__)"     && python -c "from acestep.inference import generate_music, GenerationParams; print('acestep.inference OK:', generate_music.__name__, GenerationParams.__name__)"     && python -c "import runpod; print('runpod OK')"
 
 # ---- wagi modeli ---------------------------------------------------------
-# HF_HOME wskazuje na katalog wewnatrz obrazu, wiec kazde pozniejsze
-# from_pretrained / snapshot_download trafia w gotowy cache zamiast pobierac
-# cokolwiek na workerze. To tez usuwa zaleznosc od dostepnosci HF w runtime.
+# Wagi musza lezec w {project_root}/checkpoints, a NIE w cache'u HF.
+# acestep/api/model_download.py:ensure_model_downloaded robi:
+#     model_path = os.path.join(checkpoint_dir, model_name)
+#     if os.path.exists(model_path) and os.listdir(model_path): return model_path
+# czyli pomija pobieranie wylacznie wtedy, gdy podkatalog juz istnieje.
+# Pobieranie idzie przez snapshot_download(local_dir=...), ktore omija cache HF -
+# wagi wpieczone w HF_HOME (krok 5) nie zostalyby uzyte i worker sciagalby
+# 9,4 GB przy pierwszym zadaniu.
+#
+# Repo ACE-Step/Ace-Step1.5 jest "unified": rozpakowuje sie prosto do
+# checkpoints/ i tworzy tam wszystkie cztery podkatalogi naraz.
+ENV ACESTEP_PROJECT_ROOT=/opt/ace-step
 ENV HF_HOME=/opt/hf-cache
 
-# Pobieramy TYLKO ACE-Step/Ace-Step1.5 (9,4 GB). To kompletny zestaw roboczy:
-#   acestep-v15-turbo/     4,46 GB  - DiT
-#   acestep-5Hz-lm-1.7B/   3,50 GB  - model jezykowy, w komplecie
-#   Qwen3-Embedding-0.6B/  1,12 GB
-#   vae/                   0,31 GB
-# Osobne repo acestep-5Hz-lm-4B (7,85 GB) pomijamy swiadomie: wariant 1.7B
-# jest juz tutaj, a wg constants.py potrzebuje 8 GB VRAM zamiast 12 GB.
-# Przy plastrze MIG 1g.24gb to wiekszy zapas i o 8 GB mniejszy obraz.
-ARG ACESTEP_HF_REPO=ACE-Step/Ace-Step1.5
-RUN python -c "from huggingface_hub import snapshot_download; p = snapshot_download('$ACESTEP_HF_REPO'); print('wagi pobrane do:', p)"
+# Bez tego ensure_model_downloaded probuje w runtime polaczyc sie z
+# www.google.com:443 (can_access_google), zeby wybrac zrodlo. Przy komplecie
+# wag ta sciezka i tak nie powinna sie wykonac, ale nie chcemy sondy sieciowej
+# w cold starcie workera.
+ENV ACESTEP_DOWNLOAD_SOURCE=huggingface
 
-# Piaty slad - twardy warunek powodzenia kroku 5. Sprawdza, ze kluczowe pliki
-# faktycznie sa na dysku, a nie ze samo snapshot_download zwrocilo sciezke.
-RUN python -c "import os, glob; root='/opt/hf-cache'; pliki=[f for f in glob.glob(root+'/**/*', recursive=True) if os.path.isfile(f)]; rozmiar=sum(os.path.getsize(f) for f in pliki); print('plikow: %d, razem: %.2f GB' % (len(pliki), rozmiar/1024**3)); brak=[k for k in ['acestep-v15-turbo','acestep-5Hz-lm-1.7B','Qwen3-Embedding-0.6B','vae'] if not any(k in f for f in pliki)]; assert not brak, 'brakuje katalogow: %s' % brak; assert rozmiar > 8*1024**3, 'wagi za male, pobranie niepelne'; print('wagi OK')"
+ARG ACESTEP_HF_REPO=ACE-Step/Ace-Step1.5
+RUN python -c "from huggingface_hub import snapshot_download; p = snapshot_download('$ACESTEP_HF_REPO', local_dir='/opt/ace-step/checkpoints'); print('wagi pobrane do:', p)"
+
+# Twardy warunek powodzenia. Sprawdza dokladnie to, co sprawdza ACE-Step:
+# istnienie i niepustosc kazdego podkatalogu w checkpoints/.
+# Liczy tylko pliki rzeczywiste (bez dowiazan), wiec rozmiar nie jest zawyzony.
+RUN python -c "import os; root='/opt/ace-step/checkpoints'; wymagane=['acestep-v15-turbo','acestep-5Hz-lm-1.7B','Qwen3-Embedding-0.6B','vae']; brak=[k for k in wymagane if not (os.path.isdir(os.path.join(root,k)) and os.listdir(os.path.join(root,k)))]; assert not brak, 'brak lub pusty katalog: %s' % brak; rozmiar=sum(os.path.getsize(os.path.join(d,f)) for d,_,fs in os.walk(root) for f in fs if not os.path.islink(os.path.join(d,f))); print('checkpoints: %.2f GB' % (rozmiar/1024**3)); assert rozmiar > 8*1024**3, 'wagi za male, pobranie niepelne'; print('wagi OK - ACE-Step pominie pobieranie w runtime')"
 
 # Znacznik kroku i SHA commita wstrzykiwane do obrazu - handler zwraca je
 # w odpowiedzi, wiec od razu widac, ktory build faktycznie wstal na workerze.
@@ -123,7 +131,7 @@ RUN python -c "import os, glob; root='/opt/hf-cache'; pliki=[f for f in glob.glo
 # cache wszystkich warstw ponizej.
 ARG GIT_SHA=nieznany
 ENV GIT_SHA=$GIT_SHA
-ENV BUILD_STEP="krok-5: ACE-Step 1.5 + wagi wpieczone w obraz"
+ENV BUILD_STEP="krok-5b: wagi w /opt/ace-step/checkpoints"
 
 COPY handler.py .
 
