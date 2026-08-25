@@ -129,6 +129,10 @@ def _generuj(job_input):
         # 8 krokow to wartosc dla wariantu turbo, ktory mamy w obrazie.
         inference_steps=int(job_input.get("inference_steps", 8)),
         seed=int(job_input.get("seed", -1)),
+        # Wnioskowanie modelu jezykowego (Chain-of-Thought): model sam dobiera
+        # metadane utworu i kody semantyczne. Wszystkie przyklady w repo
+        # ACE-Step maja to wlaczone, wiec domyslnie true.
+        thinking=bool(job_input.get("thinking", True)),
         bpm=job_input.get("bpm"),
         keyscale=job_input.get("keyscale", ""),
         timesignature=job_input.get("timesignature", ""),
@@ -164,11 +168,16 @@ def _generuj(job_input):
                 continue
             with open(sciezka, "rb") as f:
                 dane = f.read()
+            wpis_slownik = wpis if isinstance(wpis, dict) else {}
             utwory.append({
                 "audio_base64": base64.b64encode(dane).decode("ascii"),
                 "format": os.path.splitext(sciezka)[1].lstrip(".") or format_audio,
                 "rozmiar_bajtow": len(dane),
-                "seed": wpis.get("seed") if isinstance(wpis, dict) else None,
+                # Seed wrocil jako null przy pierwszym udanym generowaniu, wiec
+                # ACE-Step trzyma go pod innym kluczem niz zakladalem. Zanim
+                # zgadne, ktorym - niech odpowiedz sama pokaze, co jest dostepne.
+                "seed": wpis_slownik.get("seed", params.seed if params.seed >= 0 else None),
+                "dostepne_klucze": sorted(wpis_slownik.keys()),
             })
 
     if not utwory:

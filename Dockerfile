@@ -131,7 +131,7 @@ RUN python -c "import os; root='/opt/ace-step/checkpoints'; wymagane=['acestep-v
 # cache wszystkich warstw ponizej.
 ARG GIT_SHA=nieznany
 ENV GIT_SHA=$GIT_SHA
-ENV BUILD_STEP="krok-6: handler generujacy audio (ACE-Step turbo + LM 1.7B)"
+ENV BUILD_STEP="krok-6b: handler + thinking (CoT modelu jezykowego)"
 
 COPY handler.py .
 
