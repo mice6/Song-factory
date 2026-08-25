@@ -104,6 +104,36 @@ def _acestep_info():
     return info
 
 
+def _wagi_info():
+    """Czy wagi sa w obrazie. Jesli nie, generowanie probowaloby pobrac je
+    na workerze przy pierwszym zadaniu - czyli cold start liczony w minutach."""
+    root = os.environ.get("HF_HOME")
+    if not root:
+        return {"hf_home": None}
+    if not os.path.isdir(root):
+        return {"hf_home": root, "istnieje": False}
+
+    rozmiar, liczba = 0, 0
+    for katalog, _, nazwy in os.walk(root):
+        for n in nazwy:
+            try:
+                rozmiar += os.path.getsize(os.path.join(katalog, n))
+                liczba += 1
+            except OSError:
+                pass
+    obecne = [k for k in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B",
+                          "Qwen3-Embedding-0.6B", "vae")
+              if os.path.isdir(root) and any(
+                  k in d for d, _, _ in os.walk(root))]
+    return {
+        "hf_home": root,
+        "istnieje": True,
+        "plikow": liczba,
+        "rozmiar_gb": round(rozmiar / 1024 ** 3, 2),
+        "komponenty": obecne,
+    }
+
+
 def environment():
     return {
         "step": os.environ.get("BUILD_STEP", "nieznany"),
@@ -114,6 +144,7 @@ def environment():
         "nvidia_smi": _nvidia_smi(),
         "torch": _torch_info(),
         "acestep": _acestep_info(),
+        "wagi": _wagi_info(),
     }
 
 
