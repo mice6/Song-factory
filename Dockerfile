@@ -131,7 +131,7 @@ RUN python -c "import os; root='/opt/ace-step/checkpoints'; wymagane=['acestep-v
 # cache wszystkich warstw ponizej.
 ARG GIT_SHA=nieznany
 ENV GIT_SHA=$GIT_SHA
-ENV BUILD_STEP="krok-6b: handler + thinking (CoT modelu jezykowego)"
+ENV BUILD_STEP="krok-7: wzorzec glosu (reference_audio) + thinking"
 
 COPY handler.py .
 

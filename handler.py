@@ -150,6 +150,22 @@ def _generuj(job_input):
 
     start = time.time()
     with tempfile.TemporaryDirectory(prefix="acestep-") as katalog:
+        # Nagranie wzorcowe barwy glosu. ACE-Step przyjmuje SCIEZKE do pliku,
+        # a przez API dostajemy base64 - wiec zapisujemy je obok wyniku.
+        # reference_audio trafia do dit_generate_kwargs bez warunku na task_type,
+        # wiec dziala takze przy zwyklym text2music.
+        ref_b64 = job_input.get("reference_audio_base64")
+        if ref_b64:
+            ref_format = job_input.get("reference_audio_format", "mp3")
+            ref_sciezka = os.path.join(katalog, "wzorzec." + ref_format)
+            with open(ref_sciezka, "wb") as f:
+                f.write(base64.b64decode(ref_b64))
+            params.reference_audio = ref_sciezka
+            # 0.2 to wartosc zalecana w dokumentacji do przenoszenia barwy;
+            # wyzsze wartosci zaczynaja przenosic takze melodie.
+            params.audio_cover_strength = float(
+                job_input.get("audio_cover_strength", 0.2))
+
         wynik = generate_music(
             modele["dit"], modele["llm"], params, config, save_dir=katalog
         )
@@ -196,6 +212,10 @@ def _generuj(job_input):
         "czas_ladowania_modeli_s": modele["czas_ladowania_s"],
         "model": {"dit": DIT_MODEL, "lm": LM_MODEL},
         "caption": caption[:120],
+        "wzorzec_glosu": {
+            "uzyty": bool(job_input.get("reference_audio_base64")),
+            "sila": params.audio_cover_strength,
+        },
     }
 
 
